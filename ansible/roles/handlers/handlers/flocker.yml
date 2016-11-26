@@ -1,0 +1,5 @@
+---
+
+- name: restart_flocker_plugin
+  service: name=flocker-docker-plugin state=restarted
+  become: true

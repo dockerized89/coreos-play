@@ -1,0 +1,20 @@
+{
+    "CN": "{{ ansible_hostname }}",
+    "hosts": [
+        "{{ ansible_hostname }}",
+        "{{ ansible_hostname }}.local",
+        "127.0.0.1",
+        "{{ ansible_eth1['ipv4']['address'] }}"
+    ],
+    "key": {
+        "algo": "rsa",
+        "size": 2048
+    },
+    "names": [
+        {
+            "C": "{{ country }}",
+            "L": "{{ city }}",
+            "ST": "{{ state }}"
+        }
+    ]
+}

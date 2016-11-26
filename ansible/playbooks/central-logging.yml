@@ -1,0 +1,145 @@
+---
+# This playbook deploys a kubernetes cluster
+# with the default addons.
+
+- hosts: all
+  tasks:
+    - name: Copy config files for docker
+      copy:
+        src: conf
+        dest: "{{ ansible_env.HOME }}/"
+
+    - name: Setting proper memory kernel settings on host
+      shell: |
+        echo "vm.max_map_count = 262144" >> /etc/sysctl.conf
+        sysctl -p
+      become: true
+
+- hosts: master[0]
+  gather_facts: false
+  tasks:
+  - name: Create networks
+    shell: docker network create --driver overlay {{ item }}
+    with_items:
+    - elk
+    - proxy
+    
+  - name: Deploy elasticsearch service
+    shell: |
+      docker service create --name elasticsearch --network elk \
+      -p 9200:9200 \
+      elasticsearch:5.0.1
+
+  - name: Wait for elasticsearch service
+    shell: |
+      while true; do
+        REPLICAS=$(docker service ls | grep elasticsearch | awk '{print $3}')
+        if [[ $REPLICAS == "1/1" ]]; then
+            break
+        else
+            echo "Waiting for the elasticsearch service..."
+            sleep 5
+        fi
+      done
+
+  - name: Deploy logstash service
+    shell: |
+      docker service create --name logstash \
+      --mount "type=bind,source={{ ansible_env.HOME }}/conf/docker/logstash,target=/conf" \
+      --network elk \
+      -e LOGSPOUT=ignore \
+      --reserve-memory 100m \
+      logstash:5.0.1 logstash -f /conf/logstash.conf
+
+  - name: Wait for logstash service
+    shell: |
+      while true; do
+        REPLICAS=$(docker service ls | grep logstash | awk '{print $3}')
+        if [[ $REPLICAS == "1/1" ]]; then
+            break
+        else
+            echo "Waiting for the logstash service..."
+            sleep 5
+        fi
+      done
+
+
+  - name: Deploy proxy and proxy-listener
+    shell: |
+      docker service create --name swarm-listener \
+        --network proxy \
+        --mount "type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock" \
+        -e DF_NOTIF_CREATE_SERVICE_URL=http://proxy:8080/v1/docker-flow-proxy/reconfigure \
+        -e DF_NOTIF_REMOVE_SERVICE_URL=http://proxy:8080/v1/docker-flow-proxy/remove \
+        --constraint 'node.role==manager' \
+        vfarcic/docker-flow-swarm-listener
+
+      docker service create --name proxy \
+        -p 80:80 \
+        -p 443:443 \
+        --network proxy \
+        -e MODE=swarm \
+        -e LISTENER_ADDRESS=swarm-listener \
+         vfarcic/docker-flow-proxy
+
+
+  - name: Wait for proxy-listener and proxy
+    shell: |
+      while true; do
+        REPLICAS=$(docker service ls | grep swarm-listener | awk '{print $3}')
+        if [[ $REPLICAS == "1/1" ]]; then
+            break
+        else
+            echo "Waiting for the swarm-listener service..."
+            sleep 5
+        fi
+      done
+
+      while true; do
+        REPLICAS=$(docker service ls | grep proxy | awk '{print $3}')
+        if [[ $REPLICAS == "1/1" ]]; then
+            break
+        else
+            echo "Waiting for the proxy service..."
+            sleep 5
+        fi
+      done
+
+  - name: Deploy kibana service
+    shell: |
+      docker service create --name kibana \
+      --network elk \
+      -p 5601:5601 \
+      -e ELASTICSEARCH_URL=http://elasticsearch:9200 \
+      --reserve-memory 50m \
+      --label com.df.notify=true \
+      --label com.df.distribute=true \
+      --label com.df.servicePath=/app/kibana,/bundles,/elasticsearch \
+        --label com.df.port=5601 \
+      kibana:5.0
+
+  - name: Deploy logsprout service
+    shell: |
+      docker service create --name logspout \
+      --network elk \
+      --mode global \
+      --mount "type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock" \
+      -e SYSLOG_FORMAT=rfc3164 \
+      gliderlabs/logspout syslog://logstash:51415
+
+  - name: Deploy node-exporter services
+      shell: |
+        docker service create \
+        --name node-exporter \
+        --mode global \
+        --network proxy \
+        --mount "type=bind,source=/proc,target=/host/proc" \
+        --mount "type=bind,source=/sys,target=/host/sys" \
+        --mount "type=bind,source=/,target=/rootfs" \
+        prom/node-exporter:0.12.0 \
+        -collector.procfs /host/proc \
+        -collector.sysfs /host/proc \
+        -collector.filesystem.ignored-mount-points \
+        "^/(sys|proc|dev|host|etc)($|/)"
+
+  - name: 

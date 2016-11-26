@@ -1,0 +1,24 @@
+---
+- hosts: all
+  gather_facts: false
+  become: yes
+  roles:
+  #- base
+  #- docker
+  #- flocker
+  #- collectd
+  - pre-ansible
+
+#- hosts: master
+#  roles:
+  #- compose
+  #- flocker-control
+#  - pre-ansible
+#- hosts: swarm-master
+#  roles:
+  #- swarm-master
+#  - pre-ansible
+#- hosts: minion
+#  roles:
+  #- swarm
+#  - pre-ansible

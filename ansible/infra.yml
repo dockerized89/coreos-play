@@ -1,0 +1,25 @@
+---
+
+# Section needed to install python on coreos to be able to run rest of ansible config
+- hosts: all
+  gather_facts: false
+  become: yes
+  roles:
+  - pre-ansible
+
+- hosts: all
+  roles:
+  - common
+  - secure
+ 
+- hosts: master
+  become: yes
+  roles:
+  - swarm-master
+
+- hosts: minion
+  gather_facts: true
+  become: yes
+  roles:
+  - swarm
+

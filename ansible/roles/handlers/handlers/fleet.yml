@@ -1,0 +1,5 @@
+---
+
+- name: Restart fleet service
+  service: name=fleet state=restarted
+  become: true

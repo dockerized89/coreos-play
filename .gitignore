@@ -1,0 +1,5 @@
+.vagrant/
+log/
+.idea
+ca*.pem
+ca*.csr

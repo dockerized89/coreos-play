@@ -1,0 +1,64 @@
+---
+
+- name: Create all necessary dirs
+  file: path={{ item }} state=directory
+  with_items:
+  - /opt/bin
+  -   "{{ ansible_env.HOME }}/coreos_certs"
+  become: false
+  tags: [Security]
+
+- name: Download cfssl for cert generation
+  get_url:
+    url: https://pkg.cfssl.org/R1.1/cfssl_linux-amd64
+    dest: /opt/bin/cfssl
+    mode: 775
+  become: true
+  tags: [Security]
+
+- name: Download cfssljson for cert generation
+  get_url:
+    url: https://pkg.cfssl.org/R1.1/cfssljson_linux-amd64
+    dest: /opt/bin/cfssljson
+    mode: 775
+  become: true
+  tags: [Security]
+
+- name: Copy host cert file
+  template:
+    src: templates/host-cert.json.j2
+    dest: "{{ ansible_env.HOME }}/coreos_certs/{{ ansible_hostname }}.json"
+
+- name: Copy certs
+  copy:
+    src: "{{ item }}"
+    dest: "{{ ansible_env.HOME }}/coreos_certs/"
+    mode: 0644
+  with_items:
+    - ca.csr
+    - ca.pem
+    - ca-key.pem
+    - ca-config.json
+
+- name: Generate certs for node
+  shell: /opt/bin/cfssl gencert -ca=coreos_certs/ca.pem -ca-key=coreos_certs/ca-key.pem -config=coreos_certs/ca-config.json -profile=client-server coreos_certs/{{ ansible_hostname }}.json | /opt/bin/cfssljson -bare coreos
+  args:
+    chdir: "{{ ansible_env.HOME }}"
+
+- name: Set correct cert permissions
+  file: path="{{ ansible_env.HOME }}/coreos-key.pem" mode=0644
+
+- name: Move cert files to correct paths
+  shell: cp "{{ ansible_env.HOME }}/coreos_certs/ca.pem" "{{ ansible_env.HOME }}"
+  notify:
+  - Restart etcd2 service
+  - Restart fleet service
+
+#- name: Load firewall rules
+#  template:
+#    src: templates/rules-save.j2
+#    dest: /var/lib/iptables/rules-save
+#    mode: 0644
+#  become: true
+#  notify:
+#  - Restart firewall

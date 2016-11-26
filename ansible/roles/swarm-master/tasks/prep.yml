@@ -1,0 +1,8 @@
+# Set first_master variable to contain hostname of first "master" node
+- name: Set first_master fact
+  set_fact: first_master="{{ groups["master"][0] }}"
+
+# Set master_private_ip variable to contain IP of first "master" node
+- name: Set master_private_ip fact
+  set_fact: master_private_ip="{{ hostvars[first_master]['ansible_all_ipv4_addresses'][1] }}"
+

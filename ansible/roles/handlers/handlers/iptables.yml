@@ -1,0 +1,5 @@
+---
+
+- name: Restart firewall
+  service: name=iptables-restore state=restarted
+  become: true

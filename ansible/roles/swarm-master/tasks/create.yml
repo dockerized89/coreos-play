@@ -1,0 +1,47 @@
+---
+
+- name: Check if node is already in cluster
+  shell: docker info | grep Swarm | tr -d ':'
+  register: check
+
+- debug: var=check.stdout
+
+- name: Initiate swarm cluster
+  shell: /usr/bin/docker swarm init --advertise-addr "{{ groups['master'][0] }}" --listen-addr "{{ groups['master'][0] }}":2377
+  when:
+    - "'{{ groups['master'][0] }}' == '{{ ansible_eth1['ipv4']['address'] }}'"
+    - check.stdout != "Swarm active"
+  become: true
+  tags: [swarm-master]
+
+- name: get cluster worker token
+  shell: docker swarm join-token -q worker
+  register: worker_token
+  become: true
+  when:  "'{{ groups['master'][0] }}' == '{{ ansible_eth1['ipv4']['address'] }}'"
+  tags: [swarm-master]
+
+- name: get cluster manager token
+  shell: docker swarm join-token -q manager
+  register: manager_token
+  become: true
+  when:  "'{{ groups['master'][0] }}' == '{{ ansible_eth1['ipv4']['address'] }}'"
+  tags: [swarm-master]
+
+- name: save cluster worker token
+  set_fact: worker_token="{{ worker_token.stdout }}"
+  when:  "'{{ groups['master'][0] }}' == '{{ ansible_eth1['ipv4']['address'] }}'"
+  tags: [swarm-master]
+
+- name: save cluster manager token
+  set_fact: manager_token="{{ manager_token.stdout }}"
+  when:  "'{{ groups['master'][0] }}' == '{{ ansible_eth1['ipv4']['address'] }}'"
+  tags: [swarm-master]
+
+- name: Join swarm cluster as manager
+  shell: docker swarm join --token "{{ hostvars[groups['master'][0]]['manager_token'] }}" "{{ groups['master'][0] }}":2377
+  when:
+    - "'{{ groups['master'][0] }}' != '{{ ansible_eth1['ipv4']['address'] }}'"
+    - check.stdout != "Swarm active"
+  become: true
+  tags: [swarm-master]

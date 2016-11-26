@@ -1,0 +1,16 @@
+
+[master]
+192.168.51.51
+
+[minion]
+192.168.51.52
+
+[vagrant:children]
+master
+minion
+
+[swarm-master:children]
+master
+
+[swarm:children]
+minion

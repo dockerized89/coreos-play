@@ -1,0 +1,10 @@
+---
+
+- include: docker.yml
+- include: systemd.yml
+- include: swarm.yml
+- include: flocker.yml
+- include: collectd.yml
+- include: fleet.yml
+- include: etcd.yml
+- include: iptables.yml

@@ -1,0 +1,17 @@
+---
+
+- name: Restart docker
+  service: name=docker state=restarted
+  become: true
+
+- name: enable tcp port
+  shell: systemctl enable docker-tcp.socket && systemctl stop docker && systemctl start docker-tcp.socket && systemctl start docker
+  become: true
+
+- name: Wait for docker port
+  local_action:
+    module: wait_for
+      host={{ inventory_hostname }}
+      port=2375
+      delay=1
+      timeout=30

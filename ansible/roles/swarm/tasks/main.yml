@@ -1,0 +1,11 @@
+---
+
+- name: Check if node is already in cluster
+  shell: docker info | grep Swarm | tr -d ':'
+  register: check
+
+- name: Join swarm master as worker
+  shell: docker swarm join --token "{{ hostvars[groups['master'][0]]['worker_token'] }}" "{{ groups['master'][0] }}":2377
+  become: true
+  when: check.stdout != "Swarm active"
+  tags: [swarm]

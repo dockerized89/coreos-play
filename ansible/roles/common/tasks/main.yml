@@ -1,0 +1,21 @@
+---
+
+- name: Add vagrant user to the docker group
+  user:
+    name: vagrant
+    group: docker
+  register: user_result
+  become: true
+  tags: [docker]
+
+- name: Add docker default file
+  template: src=templates/docker_defaults.j2 dest=/etc/systemd/system/docker-tcp.socket mode=0644 owner=root group=root
+  notify:
+  - enable tcp port
+  - Wait for docker port
+  become: true
+  tags: [docker]
+
+
+
+
